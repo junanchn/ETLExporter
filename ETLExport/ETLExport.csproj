@@ -40,10 +40,14 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="TreeTable.cs" />
+    <Compile Include="HeapEventParser.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Text.Json">
       <Version>9.0.8</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Windows.EventTracing.Processing.All">
+      <Version>1.12.10</Version>
     </PackageReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

@@ -1,21 +1,19 @@
 using System;
+using Microsoft.Windows.EventTracing;
 
 class Program
 {
-    private static int Main()
+    private static void Main(string[] args)
     {
-        try
+        if (args.Length != 1)
         {
-            var table = new TreeTable("Column1", "Column2");
-            table.Insert(new[] { "Root", "Child1" }, 1, 2);
-            table.Insert(new[] { "Root", "Child2" }, 3, 4);
-            table.ExportToJson("output.json");
-            return 0;
+            Console.WriteLine("ETLExport <ETLPath>");
+            return;
         }
-        catch (Exception ex)
+        using (var trace = TraceProcessor.Create(args[0]))
         {
-            Console.Error.WriteLine($"Error: {ex.Message}");
-            return 1;
+            var heapParser = new HeapEventParser(trace);
+            trace.Process();
         }
     }
 }

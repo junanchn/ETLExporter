@@ -40,7 +40,7 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="TreeTable.cs" />
-    <Compile Include="HeapEventParser.cs" />
+    <Compile Include="EventParser\HeapEventParser.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Text.Json">

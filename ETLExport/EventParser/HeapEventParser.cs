@@ -98,7 +98,8 @@ class HeapEventParser
         {
             foreach (var alloc in allocs.Values)
             {
-                alloc.FreeEvent = new HeapAllocation.Event(e.ThreadId.Value, e.Timestamp, _pendingStackDataSource);
+                alloc.FreeThreadId = e.ThreadId.Value;
+                alloc.FreeTime = e.Timestamp;
                 _heapAllocations.Add(alloc);
             }
             _heaps.Remove(heap);
@@ -124,7 +125,8 @@ class HeapEventParser
         var allocs = GetHeap(heap);
         if (allocs.TryGetValue(addr, out var alloc))
         {
-            alloc.FreeEvent = new HeapAllocation.Event(e.ThreadId.Value, e.Timestamp, _pendingStackDataSource);
+            alloc.FreeThreadId = e.ThreadId.Value;
+            alloc.FreeTime = e.Timestamp;
             allocs.Remove(addr);
             _heapAllocations.Add(alloc);
         }
@@ -142,34 +144,25 @@ class HeapEventParser
 
 public class HeapAllocation
 {
+    private readonly IPendingResult<IStackDataSource> _pendingStackDataSource;
     public int ProcessId { get; }
     public ulong HeapHandle { get; }
     public AddressRange AddressRange { get; }
-    public Event AllocEvent { get; }
-    public Event FreeEvent { get; set; }
+    public int AllocThreadId { get; }
+    public TraceTimestamp AllocTime { get; }
+    public IStackSnapshot AllocStack => _pendingStackDataSource.Result.GetStack(AllocTime, AllocThreadId);
+    public int? FreeThreadId { get; set; }
+    public TraceTimestamp? FreeTime { get; set; }
+    public IStackSnapshot FreeStack => _pendingStackDataSource.Result.GetStack(AllocTime, AllocThreadId);
 
     public HeapAllocation(int processId, ulong heapHandle, AddressRange addressRange,
-        int allocThreadId, TraceTimestamp allocTimestamp, IPendingResult<IStackDataSource> pendingStackDataSource)
+        int allocThreadId, TraceTimestamp allocTime, IPendingResult<IStackDataSource> pendingStackDataSource)
     {
         ProcessId = processId;
         HeapHandle = heapHandle;
         AddressRange = addressRange;
-        AllocEvent = new Event(allocThreadId, allocTimestamp, pendingStackDataSource);
-    }
-
-    public class Event
-    {
-        private readonly IPendingResult<IStackDataSource> _pendingStackDataSource;
-
-        public int ThreadId { get; }
-        public TraceTimestamp Timestamp { get; }
-        public IStackSnapshot Stack => _pendingStackDataSource.Result.GetStack(Timestamp, ThreadId);
-
-        public Event(int threadId, TraceTimestamp timestamp, IPendingResult<IStackDataSource> pendingStackDataSource)
-        {
-            ThreadId = threadId;
-            Timestamp = timestamp;
-            _pendingStackDataSource = pendingStackDataSource;
-        }
+        AllocThreadId = allocThreadId;
+        AllocTime = allocTime;
+        _pendingStackDataSource = pendingStackDataSource;
     }
 }

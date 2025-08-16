@@ -46,6 +46,46 @@ public class TreeTable
         }
     }
 
+    public TreeTable CreateDiff(TreeTable baseTable)
+    {
+        var diffColumns = ColumnNames.Select(c => c + "Test")
+            .Concat(ColumnNames.Select(c => c + "Base"))
+            .Concat(ColumnNames.Select(c => c + "Diff"))
+            .ToArray();
+        var diffTable = new TreeTable(diffColumns);
+
+        CreateDiffNode(diffTable.Root, Root, baseTable.Root);
+        return diffTable;
+    }
+
+    private void CreateDiffNode(Node diffNode, Node testNode, Node baseNode)
+    {
+        var testValues = testNode?.Values ?? new long[ColumnNames.Length];
+        var baseValues = baseNode?.Values ?? new long[ColumnNames.Length];
+        var diffValues = testValues
+            .Concat(baseValues)
+            .Concat(testValues.Zip(baseValues, (a, b) => a - b))
+            .ToArray();
+        diffNode.Values = diffValues;
+
+        var allKeys = new HashSet<string>();
+        if (testNode != null)
+            allKeys.UnionWith(testNode.Children.Keys);
+        if (baseNode != null)
+            allKeys.UnionWith(baseNode.Children.Keys);
+
+        foreach (var key in allKeys)
+        {
+            Node testChild = null;
+            Node baseChild = null;
+            testNode?.Children.TryGetValue(key, out testChild);
+            baseNode?.Children.TryGetValue(key, out baseChild);
+
+            var diffChild = diffNode.Children[key] = new Node();
+            CreateDiffNode(diffChild, testChild, baseChild);
+        }
+    }
+
     public void ExportToJson(string filePath)
     {
         using (var stream = File.Create(filePath))

@@ -40,6 +40,13 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="TreeTable.cs" />
+    <Compile Include="AnalysisTable\AnalysisTableBase.cs" />
+    <Compile Include="AnalysisTable\CpuUsagePrecise.cs" />
+    <Compile Include="AnalysisTable\CpuUsageSampled.cs" />
+    <Compile Include="AnalysisTable\DiskUsage.cs" />
+    <Compile Include="AnalysisTable\HeapAllocations.cs" />
+    <Compile Include="AnalysisTable\Images.cs" />
+    <Compile Include="AnalysisTable\TotalCommit.cs" />
     <Compile Include="EventParser\HeapEventParser.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TreeTableViewer</title>
+    <style>
+      :root,
+      body {
+        height: 100%;
+        margin: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        padding: 16px;
+      }
+
+      #myGrid{
+        --ag-row-group-indent-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div style="background-color: #f0f8ff; padding: 10px; margin-bottom: 10px; border-radius: 4px; font-size: 14px; color: #333;">
+      <strong>How to use:</strong> Drag a JSON file to the area below. Click headers to sort. Use arrow keys to expand/collapse nodes.
+    </div>
+    <div id="myGrid" style="height: calc(100% - 60px);"></div>
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-enterprise@34.0.0/dist/ag-grid-enterprise.min.js"></script>
+    <script>
+      let gridApi;
+
+      const gridOptions = {
+        columnDefs: [],
+        rowData: [],
+        treeData: true,
+        treeDataChildrenField: "c",
+        autoGroupColumnDef: {
+          field: "n",
+          headerName: 'Group',
+          flex: 1,
+          minWidth: 300,
+          cellRendererParams: {
+            suppressCount: true,
+            indentWidth: 1,
+          },
+        },
+        animateRows: false,
+        suppressGroupRowsSticky: true,
+        theme: agGrid.themeBalham, // Compact theme for better data density
+        rowHeight: 21.6, // Options: 19.2px, 21.0px, or 21.6px
+        // Arrow keys expand/collapse nodes
+        onCellKeyDown: (event) => {
+          const { event: keyEvent, node, api } = event;
+          
+          if (keyEvent.key === 'ArrowRight') {
+            if (!node.expanded && node.childrenAfterGroup?.length > 0) {
+              node.setExpanded(true);
+            }
+            if (node.childrenAfterGroup?.length > 0) {
+              setTimeout(() => {
+                const nextRowIndex = node.rowIndex + 1;
+                const nextRow = api.getDisplayedRowAtIndex(nextRowIndex);
+                if (nextRow) {
+                  api.setFocusedCell(nextRowIndex, 'ag-Grid-AutoColumn');
+                }
+              }, 50);
+            }
+            keyEvent.preventDefault();
+          }
+          
+          if (keyEvent.key === 'ArrowLeft') {
+            if (node.expanded && node.childrenAfterGroup?.length > 0) {
+              node.setExpanded(false);
+            } else if (node.parent) {
+              api.setFocusedCell(node.parent.rowIndex, 'ag-Grid-AutoColumn');
+            }
+            keyEvent.preventDefault();
+          }
+        },
+      };
+
+      document.addEventListener("DOMContentLoaded", function () {
+        const gridDiv = document.querySelector("#myGrid");
+        gridApi = agGrid.createGrid(gridDiv, gridOptions);
+        
+        gridDiv.addEventListener('dragover', function(e) {
+            e.preventDefault();
+        });
+        
+        gridDiv.addEventListener('drop', function(e) {
+          e.preventDefault();
+
+          const file = e.dataTransfer.files[0];
+
+          if (!file || !file.name.endsWith('.json')) {
+            alert('Please drop a JSON file');
+            return;
+          }
+
+          // Clear grid and show loading
+          gridApi.setGridOption("rowData", []);
+          gridApi.setGridOption("loading", true);
+
+          const reader = new FileReader();
+
+          reader.onload = function(e) {
+            try {
+              const jsonData = JSON.parse(e.target.result);
+
+              // Validate data format
+              if (!jsonData.columnNames || !jsonData.treeData)
+                throw new Error('Invalid JSON format. Need columnNames and treeData fields');
+
+              // Create column configuration
+              const columnNames = [];
+              for (let i = 0; i < jsonData.columnNames.length; i++) {
+                  const columnName = jsonData.columnNames[i];
+                  const column = {
+                      field: i.toString(),
+                      headerName: columnName,
+                      width: 120,
+                      aggFunc: 'sum',
+                      cellStyle: { textAlign: 'right' },
+                      valueFormatter: function(p) {
+                          return p.value ? p.value.toLocaleString() : '';
+                      },
+                      filter: "agNumberColumnFilter"
+                  };
+                  
+                  columnNames.push(column);
+              }
+              
+              gridApi.setGridOption('columnDefs', columnNames);
+              gridApi.setGridOption('rowData', jsonData.treeData);
+              document.title = file.name;
+
+            } catch (error) {
+              alert('Failed to load data: ' + error.message);
+            }
+            
+            // Hide loading state
+            gridApi.setGridOption('loading', false);
+          };
+
+          reader.onerror = function() {
+            gridApi.setGridOption('loading', false);
+            alert('Failed to read file');
+          };
+
+          reader.readAsText(file);
+        });
+      });
+    </script>
+  </body>
+</html>

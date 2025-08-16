@@ -40,6 +40,7 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="TreeTable.cs" />
+    <Compile Include="GenericEventFinder.cs" />
     <Compile Include="AnalysisTable\AnalysisTableBase.cs" />
     <Compile Include="AnalysisTable\CpuUsagePrecise.cs" />
     <Compile Include="AnalysisTable\CpuUsageSampled.cs" />

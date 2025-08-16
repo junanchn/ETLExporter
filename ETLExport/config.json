@@ -1,0 +1,22 @@
+﻿{
+  "StartEvent": {
+    "ProviderId": null,
+    "Task": null,
+    "Opcode": null,
+    "ProviderName": null,
+    "TaskName": null,
+    "OpcodeName": null
+  },
+  "EndEvent": {
+    "ProviderId": null,
+    "Task": null,
+    "Opcode": null,
+    "ProviderName": null,
+    "TaskName": null,
+    "OpcodeName": null
+  },
+  "ProcessRegex": "",
+  "SymbolPaths": [],
+  "SymbolProcesses": [],
+  "Tables": []
+}

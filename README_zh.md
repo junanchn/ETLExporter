@@ -208,7 +208,7 @@ ETLMerge.exe merge.json run1.etl.HeapAllocations.json run2.etl.HeapAllocations.j
 
 - [Windows Performance Toolkit 文档](https://docs.microsoft.com/zh-cn/windows-hardware/test/wpt/)
 - [ETW 文档](https://docs.microsoft.com/zh-cn/windows/win32/etw/event-tracing-portal)
-- [TraceProcessor Documentation](https://docs.microsoft.com/zh-cn/windows/apps/trace-processing/)
+- [TraceProcessor 文档](https://docs.microsoft.com/zh-cn/windows/apps/trace-processing/)
 
 ## 许可证
 

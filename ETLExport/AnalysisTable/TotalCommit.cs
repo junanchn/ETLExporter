@@ -94,7 +94,7 @@ public class TotalCommit : AnalysisTableBase
     }
 }
 
-public class TotalCommitReverse : HeapAllocations
+public class TotalCommitReverse : TotalCommit
 {
     public override string TableName => "TotalCommitReverse";
     protected override bool StackReverse => true;

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 
 class Program
 {
@@ -12,17 +13,32 @@ class Program
 
         try
         {
-            var result = TreeTable.ImportFromJson(args[1]);
-            for (int i = 2; i < args.Length; i++)
+            for (int i = 1; i < args.Length; i++)
             {
-                result.Add(TreeTable.ImportFromJson(args[i]));
-                Console.WriteLine($"Merged file: {args[i]}");
+                if (!File.Exists(args[i]))
+                    throw new FileNotFoundException($"Input file not found: {args[i]}");
             }
-            result.ExportToJson(args[0]);
+
+            TreeTable mergedTable = null;
+            for (int i = 1; i < args.Length; i++)
+            {
+                var table = TreeTable.ImportFromJson(args[i]);
+
+                if (mergedTable == null)
+                    mergedTable = table;
+                else
+                    mergedTable.Add(table);
+
+                Console.WriteLine($"Merged: {args[i]}");
+            }
+
+            mergedTable.ExportToJson(args[0]);
+            Console.WriteLine($"Output: {args[0]}");
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error: {ex.Message}");
+            Environment.Exit(1);
         }
     }
 }

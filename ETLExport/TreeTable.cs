@@ -104,6 +104,7 @@ public class TreeTable
 
     public void ExportToJson(string filePath)
     {
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(filePath)));
         using (var stream = File.Create(filePath))
         using (var writer = new Utf8JsonWriter(stream))
         {

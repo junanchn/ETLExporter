@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 
 public class TreeTable
@@ -20,26 +21,26 @@ public class TreeTable
         }
     }
 
-    public string[] Columns;
+    public string[] ColumnNames;
     public readonly Node Root;
 
-    public TreeTable(params string[] columns)
+    public TreeTable(params string[] columnNames)
     {
-        Columns = columns;
+        ColumnNames = columnNames;
         Root = new Node();
     }
 
-    public void Insert(IEnumerable<string> path, params long[] values)
+    public void Add(IEnumerable<string> path, params long[] values)
     {
-        Debug.Assert(values.Length == Columns.Length);
+        Debug.Assert(values.Length == ColumnNames.Length);
 
         var current = Root;
         current.Add(values);
 
-        foreach (var key in path)
+        foreach (var name in path)
         {
-            if (!current.Children.TryGetValue(key, out var child))
-                child = current.Children[key] = new Node();
+            if (!current.Children.TryGetValue(name, out var child))
+                child = current.Children[name] = new Node();
             current = child;
             current.Add(values);
         }
@@ -50,31 +51,38 @@ public class TreeTable
         using (var stream = File.Create(filePath))
         using (var writer = new Utf8JsonWriter(stream))
         {
-            writer.WriteStartArray();
-            foreach (var kvp in Root.Children)
-                ExportNode(kvp.Key, kvp.Value, writer);
+            writer.WriteStartObject();
+
+            writer.WriteStartArray("columnNames");
+            foreach (var name in ColumnNames)
+                writer.WriteStringValue(name);
             writer.WriteEndArray();
+
+            writer.WriteStartArray("treeData");
+            foreach (var kvp in Root.Children)
+                ExportNodeToJson(kvp.Key, kvp.Value, writer);
+            writer.WriteEndArray();
+
+            writer.WriteEndObject();
         }
     }
 
-    private void ExportNode(string name, Node node, Utf8JsonWriter writer)
+    private void ExportNodeToJson(string name, Node node, Utf8JsonWriter writer)
     {
         writer.WriteStartObject();
-        writer.WriteString("name", name);
-        
+        writer.WriteString("n", name);
         if (node.Children.Count > 0)
         {
-            writer.WriteStartArray("children");
+            writer.WriteStartArray("c");
             foreach (var kvp in node.Children)
-                ExportNode(kvp.Key, kvp.Value, writer);
+                ExportNodeToJson(kvp.Key, kvp.Value, writer);
             writer.WriteEndArray();
         }
         else
         {
-            for (int i = 0; i < Columns.Length; i++)
-                writer.WriteNumber(Columns[i], node.Values[i]);
+            for (int i = 0; i < ColumnNames.Length; i++)
+                writer.WriteNumber(i.ToString(), node.Values[i]);
         }
-        
         writer.WriteEndObject();
     }
 
@@ -83,36 +91,33 @@ public class TreeTable
         using (var stream = File.OpenRead(filePath))
         using (var document = JsonDocument.Parse(stream, new JsonDocumentOptions { MaxDepth = 4096 }))
         {
-            var table = new TreeTable();
             var root = document.RootElement;
-            foreach (var child in root.EnumerateArray())
-                table.ImportNode(child, table.Root);
+            var columnNames = root.GetProperty("columnNames")
+                .EnumerateArray()
+                .Select(e => e.GetString())
+                .ToArray();
+            var table = new TreeTable(columnNames);
+            var treeData = root.GetProperty("treeData");
+            foreach (var element in treeData.EnumerateArray())
+                table.ImportNodeFromJson(element, table.Root);
             return table;
         }
     }
 
-    private void ImportNode(JsonElement element, Node parent)
+    private void ImportNodeFromJson(JsonElement element, Node parent)
     {
-        var name = element.GetProperty("name").GetString();
+        var name = element.GetProperty("n").GetString();
         var node = parent.Children[name] = new Node();
-        if (element.TryGetProperty("children", out var children))
+        if (element.TryGetProperty("c", out var children))
         {
             foreach (var child in children.EnumerateArray())
-                ImportNode(child, node);
+                ImportNodeFromJson(child, node);
         }
         else
         {
-            if (Columns.Length == 0)
-            {
-                var columns = new List<string>();
-                foreach (var prop in element.EnumerateObject())
-                    if (prop.Name != "name" && prop.Name != "children" && prop.Value.ValueKind == JsonValueKind.Number)
-                        columns.Add(prop.Name);
-                Columns = columns.ToArray();
-            }
-            var values = new long[Columns.Length];
-            for (int i = 0; i < Columns.Length; i++)
-                values[i] = element.GetProperty(Columns[i]).GetInt64();
+            var values = new long[ColumnNames.Length];
+            for (int i = 0; i < ColumnNames.Length; i++)
+                values[i] = element.GetProperty(i.ToString()).GetInt64();
             node.Values = values;
         }
         parent.Add(node.Values);

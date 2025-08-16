@@ -46,6 +46,22 @@ public class TreeTable
         }
     }
 
+    public void Add(TreeTable other)
+    {
+        AddNode(Root, other.Root);
+    }
+
+    private void AddNode(Node node, Node other)
+    {
+        node.Add(other.Values);
+        foreach (var kvp in other.Children)
+        {
+            if (!node.Children.TryGetValue(kvp.Key, out var child))
+                child = node.Children[kvp.Key] = new Node();
+            AddNode(child, kvp.Value);
+        }
+    }
+
     public TreeTable CreateDiff(TreeTable baseTable)
     {
         var diffColumns = ColumnNames.Select(c => c + "Test")
@@ -161,5 +177,32 @@ public class TreeTable
             node.Values = values;
         }
         parent.Add(node.Values);
+    }
+
+    public void RenameLeaves(string name)
+    {
+        RenameLeaves(Root, name);
+    }
+
+    private void RenameLeaves(Node node, string name)
+    {
+        if (node.Children.Count == 0)
+            return;
+
+        var leavesToRename = new List<KeyValuePair<string, Node>>();
+
+        foreach (var kvp in node.Children)
+        {
+            if (kvp.Value.Children.Count > 0)
+                RenameLeaves(kvp.Value, name);
+            else
+                leavesToRename.Add(kvp);
+        }
+
+        foreach (var kvp in leavesToRename)
+        {
+            node.Children.Remove(kvp.Key);
+            node.Children[name] = kvp.Value;
+        }
     }
 }

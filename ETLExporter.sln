@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ETLExport", "ETLExport\ETLE
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ETLDiff", "ETLDiff\ETLDiff.csproj", "{26C56CC1-4571-4CBD-A3C6-4AE418501F1F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ETLMerge", "ETLMerge\ETLMerge.csproj", "{59F563F7-8FC8-4FAB-9D48-23194DF6D38E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{26C56CC1-4571-4CBD-A3C6-4AE418501F1F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{26C56CC1-4571-4CBD-A3C6-4AE418501F1F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{26C56CC1-4571-4CBD-A3C6-4AE418501F1F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{59F563F7-8FC8-4FAB-9D48-23194DF6D38E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{59F563F7-8FC8-4FAB-9D48-23194DF6D38E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{59F563F7-8FC8-4FAB-9D48-23194DF6D38E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{59F563F7-8FC8-4FAB-9D48-23194DF6D38E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

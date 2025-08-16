@@ -13,21 +13,25 @@ class Program
 
         try
         {
-            if (!File.Exists(args[1]))
-                throw new FileNotFoundException($"Test file not found: {args[1]}");
-            if (!File.Exists(args[2]))
-                throw new FileNotFoundException($"Base file not found: {args[2]}");
+            var outputPath = args[0];
+            var testPath = args[1];
+            var basePath = args[2];
 
-            var testTable = TreeTable.ImportFromJson(args[1]);
-            Console.WriteLine($"Loaded: {args[1]}");
+            if (!File.Exists(testPath))
+                throw new FileNotFoundException($"Test file not found: {testPath}");
+            if (!File.Exists(basePath))
+                throw new FileNotFoundException($"Base file not found: {basePath}");
 
-            var baseTable = TreeTable.ImportFromJson(args[2]);
-            Console.WriteLine($"Loaded: {args[2]}");
+            var testTable = TreeTable.ImportFromJson(testPath);
+            Console.WriteLine($"Loaded: {testPath}");
+
+            var baseTable = TreeTable.ImportFromJson(basePath);
+            Console.WriteLine($"Loaded: {basePath}");
 
             var diffTable = testTable.CreateDiff(baseTable);
 
-            diffTable.ExportToJson(args[0]);
-            Console.WriteLine($"Output: {args[0]}");
+            diffTable.ExportToJson(outputPath);
+            Console.WriteLine($"Output: {outputPath}");
         }
         catch (Exception ex)
         {

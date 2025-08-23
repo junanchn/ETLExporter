@@ -1,13 +1,14 @@
-﻿using System.Collections.Generic;
-using Microsoft.Windows.EventTracing;
+﻿using Microsoft.Windows.EventTracing;
 using Microsoft.Windows.EventTracing.Symbols;
 using Microsoft.Windows.EventTracing.Processes;
 
-public abstract class AnalysisTableBase
+namespace ETLExport;
+
+abstract class AnalysisTableBase
 {
     public abstract string TableName { get; }
     public abstract string[] ColumnNames { get; }
-    public TreeTable Table { get; protected set; }
+    public TreeTable Table { get; set; }
 
     protected AnalysisTableBase()
     {
@@ -27,15 +28,15 @@ public abstract class AnalysisTableBase
             return 0;
     }
 
-    protected static List<string> StackStringList(IThreadStack stack)
+    protected static List<string> StackStringList(IThreadStack? stack)
     {
-        if (stack == null || stack.Frames.Count == 0)
-            return new List<string> { "N/A" };
+        if (stack is null || stack.Frames.Count == 0)
+            return ["N/A"];
 
         if (stack.IsIdle)
-            return new List<string> { "[Idle]" };
+            return ["[Idle]"];
 
-        var result = new List<string> { "[Root]" };
+        List<string> result = ["[Root]"];
         var frames = stack.Frames;
 
         for (int i = frames.Count - 1; i >= 0; i--)

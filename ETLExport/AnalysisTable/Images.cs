@@ -1,11 +1,12 @@
-﻿using System.Collections.Generic;
-using Microsoft.Windows.EventTracing;
+﻿using Microsoft.Windows.EventTracing;
 using Microsoft.Windows.EventTracing.Processes;
 
-public class Images : AnalysisTableBase
+namespace ETLExport;
+
+class Images : AnalysisTableBase
 {
     public override string TableName => "Images";
-    public override string[] ColumnNames => new[] { "Count", "Size" };
+    public override string[] ColumnNames => ["Count", "Size"];
 
     public override void UseTrace(ITraceProcessor trace)
     {
@@ -23,9 +24,7 @@ public class Images : AnalysisTableBase
                 if (size != 0)
                 {
                     var stack = StackStringList(image.LoadStack);
-                    var path = new List<string> { process.ImageName, image.FileName };
-                    path.AddRange(stack);
-                    path.Add("");
+                    List<string> path = [process.ImageName, image.FileName, ..stack, ""];
                     Table.Add(path, 1, size);
                 }
             }

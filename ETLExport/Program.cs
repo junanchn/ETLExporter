@@ -1,152 +1,222 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text.Json;
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Windows.EventTracing;
 using Microsoft.Windows.EventTracing.Symbols;
+using Microsoft.Windows.EventTracing.Processes;
 
-public class ETLExportConfig
+namespace ETLExport;
+
+record Config
 {
-    public GenericEventFilter StartEvent { get; set; }
-    public GenericEventFilter EndEvent { get; set; }
-    public string ProcessRegex { get; set; }
-    public List<string> SymbolPaths { get; set; } = new List<string>();
-    public List<string> SymbolProcesses { get; set; } = new List<string>();
-    public List<string> Tables { get; set; } = new List<string>();
+    public required GenericEventFilter StartEvent { get; init; }
+    public required GenericEventFilter EndEvent { get; init; }
+    public required string ProcessRegex { get; init; }
+    public List<string> SymbolPaths { get; init; } = [];
+    public List<string> SymbolProcesses { get; init; } = [];
+    public required List<string> Tables { get; init; }
 }
 
 class Program
 {
-    private static void Main(string[] args)
+    static void Main(string[] args)
     {
-        if (args.Length != 2)
-        {
-            Console.WriteLine("Usage: ETLExport <config.json> <input.etl>");
-            return;
-        }
-
-        var configPath = args[0];
-        var etlPath = args[1];
-
-        ETLExportConfig config;
         try
         {
-            config = JsonSerializer.Deserialize<ETLExportConfig>(File.ReadAllText(configPath));
-            if (config == null)
+            if (args.Length == 0)
             {
-                Console.WriteLine("Error: Invalid configuration file.");
+                ShowUsage();
                 return;
             }
+
+            var (etlPath, config) = ParseArguments(args);
+
+            var errors = ValidateArguments(etlPath, config);
+            if (errors.Count > 0)
+            {
+                foreach (var error in errors)
+                    Console.WriteLine(error);
+                Environment.Exit(1);
+            }
+
+            var presets = CreateTablePresets(config!.Tables);
+            if (presets.Count == 0)
+            {
+                throw new InvalidOperationException("No valid tables to export");
+            }
+
+            ProcessTrace(etlPath!, config, presets);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error: Failed to load config - {ex.Message}");
-            return;
+            Console.WriteLine($"Error: {ex.Message}");
+            Console.WriteLine("Stack:");
+            Console.WriteLine(ex.StackTrace);
+            Environment.Exit(1);
         }
+    }
 
-        var presets = new List<AnalysisTableBase>();
-        foreach (var tableName in config.Tables)
+    static void ShowUsage()
+    {
+        Console.WriteLine("Usage:");
+        Console.WriteLine("  ETLExport <etl-file> [config-file] [options]");
+        Console.WriteLine();
+        Console.WriteLine("Examples:");
+        Console.WriteLine("  ETLExport trace.etl                           # Use trace.etl with default config");
+        Console.WriteLine("  ETLExport trace.etl custom.json               # Use trace.etl with custom config");
+        Console.WriteLine("  ETLExport custom.json trace.etl               # Same as above (order doesn't matter)");
+        Console.WriteLine("  ETLExport trace.etl --SymbolPaths C:\\Symbols  # Override config via command line");
+        Console.WriteLine();
+        Console.WriteLine("Options:");
+        Console.WriteLine("  --ProcessRegex <regex>         Process name filter");
+        Console.WriteLine("  --SymbolPaths <path>           Symbol search paths (can be repeated)");
+        Console.WriteLine("  --SymbolProcesses <name>       Processes to load symbols for (can be repeated)");
+        Console.WriteLine("  --Tables <name>                Tables to export (can be repeated)");
+        Console.WriteLine("  --StartEvent:TaskName <name>   Start event task name");
+        Console.WriteLine("  --EndEvent:TaskName <name>     End event task name");
+    }
+
+    static (string? etlPath, Config? config) ParseArguments(string[] args)
+    {
+        var fileArgs = args.TakeWhile((arg, index) => index < 2 && !arg.StartsWith("--")).ToList();
+        var configArgs = args.Skip(fileArgs.Count).ToArray();
+
+        string? etlPath = fileArgs.FirstOrDefault(f => f.EndsWith(".etl", StringComparison.OrdinalIgnoreCase));
+        string? configPath = fileArgs.FirstOrDefault(f => f.EndsWith(".json", StringComparison.OrdinalIgnoreCase));
+
+        configPath ??= "config.json";
+
+        var config = new ConfigurationBuilder()
+            .AddJsonFile(configPath, optional: true)
+            .AddCommandLine(configArgs)
+            .Build()
+            .Get<Config>();
+
+        return (etlPath, config);
+    }
+
+    static List<string> ValidateArguments(string? etlPath, Config? config)
+    {
+        List<string> errors = [];
+
+        if (string.IsNullOrEmpty(etlPath))
+            errors.Add("Error: ETL file not specified");
+        else if (!File.Exists(etlPath))
+            errors.Add($"Error: ETL file not found: {etlPath}");
+
+        if (config is null)
         {
-            switch (tableName)
-            {
-                case "CpuUsagePrecise":
-                    presets.Add(new CpuUsagePrecise());
-                    break;
-                case "CpuUsageSampled":
-                    presets.Add(new CpuUsageSampled());
-                    break;
-                case "DiskUsage":
-                    presets.Add(new DiskUsage());
-                    break;
-                case "HeapAllocations":
-                    presets.Add(new HeapAllocations());
-                    break;
-                case "HeapAllocationsReverse":
-                    presets.Add(new HeapAllocationsReverse());
-                    break;
-                case "Images":
-                    presets.Add(new Images());
-                    break;
-                case "TotalCommit":
-                    presets.Add(new TotalCommit());
-                    break;
-                case "TotalCommitReverse":
-                    presets.Add(new TotalCommitReverse());
-                    break;
-                default:
-                    Console.WriteLine($"Error: Unknown table: {tableName}");
-                    return;
-            }
+            errors.Add("Error: Configuration not specified or invalid");
+            return errors;
         }
 
-        if (presets.Count == 0)
+        if (config.Tables.Count == 0)
+            errors.Add("Error: At least one output table must be specified");
+
+        return errors;
+    }
+
+    static List<AnalysisTableBase> CreateTablePresets(List<string> tables)
+    {
+        List<AnalysisTableBase> presets = [];
+
+        foreach (var tableName in tables.Distinct())
         {
-            Console.WriteLine("Error: No tables specified in configuration.");
-            return;
+            AnalysisTableBase? preset = tableName switch
+            {
+                "CpuUsagePrecise" => new CpuUsagePrecise(),
+                "CpuUsageSampled" => new CpuUsageSampled(),
+                "DiskUsage" => new DiskUsage(),
+                "HeapAllocations" => new HeapAllocations(),
+                "HeapAllocationsReverse" => new HeapAllocationsReverse(),
+                "Images" => new Images(),
+                "TotalCommit" => new TotalCommit(),
+                "TotalCommitReverse" => new TotalCommitReverse(),
+                _ => null
+            };
+
+            if (preset is not null)
+                presets.Add(preset);
+            else
+                Console.WriteLine($"Warning: Unknown table name: {tableName}");
         }
 
-        using (var trace = TraceProcessor.Create(etlPath))
+        return presets;
+    }
+
+    static void ProcessTrace(string etlPath, Config config, List<AnalysisTableBase> presets)
+    {
+        using var trace = TraceProcessor.Create(etlPath);
+
+        var processes = trace.UseProcesses();
+        var symbols = trace.UseSymbols();
+
+        foreach (var preset in presets)
+            preset.UseTrace(trace);
+
+        var startEventFinder = new GenericEventFinder(config.StartEvent!, trace);
+        var endEventFinder = new GenericEventFinder(config.EndEvent!, trace);
+
+        trace.Process();
+
+        var (startTime, endTime) = GetTimeRange(startEventFinder, endEventFinder);
+
+        var targetProcesses = GetTargetProcesses(processes, config.ProcessRegex);
+
+        if (config.SymbolPaths.Count > 0 && config.SymbolProcesses.Count > 0)
         {
-            var processes = trace.UseProcesses();
-            var symbols = trace.UseSymbols();
-            foreach (var preset in presets)
-                preset.UseTrace(trace);
-
-            var startEventFinder = new GenericEventFinder(config.StartEvent, trace);
-            var endEventFinder = new GenericEventFinder(config.EndEvent, trace);
-
-            trace.Process();
-
-            var startEvents = startEventFinder.FindEvents();
-            var endEvents = endEventFinder.FindEvents();
-
-            if (startEvents.Count > 1 || endEvents.Count > 1)
-            {
-                Console.WriteLine($"Warning: Multiple events found (Start: {startEvents.Count}, End: {endEvents.Count}). Using first occurrence.");
-            }
-
-            if (startEvents.Count == 0 || endEvents.Count == 0)
-            {
-                Console.WriteLine($"Error: Required events not found (Start: {startEvents.Count}, End: {endEvents.Count}).");
-                return;
-            }
-
-            var startTime = startEvents[0].Timestamp.Nanoseconds;
-            var endTime = endEvents[0].Timestamp.Nanoseconds;
-
-            if (endTime <= startTime)
-            {
-                Console.WriteLine("Error: Invalid time range. End time must be after start time.");
-                return;
-            }
-
-            var processRegex = string.IsNullOrEmpty(config.ProcessRegex) ? null : new Regex(config.ProcessRegex);
-            var targetProcesses = processes.Result.Processes
-                .Where(p => p.CommandLine != null && (processRegex == null || processRegex.IsMatch(p.CommandLine)))
-                .ToArray();
-
-            if (targetProcesses.Length == 0)
-            {
-                Console.WriteLine($"Error: No processes matched the regex filter '{config.ProcessRegex}'");
-                return;
-            }
-
-            if (config.SymbolPaths?.Count > 0 && config.SymbolProcesses?.Count > 0)
-            {
-                symbols.Result.LoadSymbolsForConsoleAsync(
-                    SymCachePath.Automatic,
-                    new SymbolPath(config.SymbolPaths.ToArray()),
-                    config.SymbolProcesses.ToArray()).Wait();
-            }
-
-            foreach (var preset in presets)
-            {
-                preset.Process(targetProcesses, startTime, endTime);
-                preset.Table.ExportToJson($"{etlPath}.{preset.TableName}.json");
-                Console.WriteLine($"Exported: {etlPath}.{preset.TableName}.json");
-            }
+            symbols.Result.LoadSymbolsForConsoleAsync(
+                SymCachePath.Automatic,
+                new SymbolPath(config.SymbolPaths.ToArray()),
+                config.SymbolProcesses.ToArray()).Wait();
         }
+
+        foreach (var preset in presets)
+        {
+            preset.Process(targetProcesses, startTime, endTime);
+            preset.Table.ExportToJson($"{etlPath}.{preset.TableName}.json");
+            Console.WriteLine($"Exported: {etlPath}.{preset.TableName}.json");
+        }
+    }
+
+    static (long startTime, long endTime) GetTimeRange(GenericEventFinder startEventFinder, GenericEventFinder endEventFinder)
+    {
+        var startEvents = startEventFinder.FindEvents();
+        var endEvents = endEventFinder.FindEvents();
+
+        if (startEvents.Count == 0 || endEvents.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"Required events not found (Start: {startEvents.Count}, End: {endEvents.Count})");
+        }
+
+        if (startEvents.Count > 1 || endEvents.Count > 1)
+        {
+            Console.WriteLine($"Warning: Multiple events found (Start: {startEvents.Count}, End: {endEvents.Count}).");
+        }
+
+        var startTime = startEvents[0].Timestamp.Nanoseconds;
+        var endTime = endEvents[0].Timestamp.Nanoseconds;
+
+        if (endTime <= startTime)
+        {
+            throw new InvalidOperationException(
+                $"Invalid time range: End time ({endTime}) must be after start time ({startTime})");
+        }
+
+        return (startTime, endTime);
+    }
+
+    static IProcess[] GetTargetProcesses(IPendingResult<IProcessDataSource> processes, string processRegex)
+    {
+        var regex = new Regex(processRegex, RegexOptions.Compiled);
+
+        var result = processes.Result.Processes
+            .Where(p => p.CommandLine is not null && regex.IsMatch(p.CommandLine))
+            .ToArray();
+
+        if (result.Length == 0)
+            throw new InvalidOperationException($"No processes matched the regex: {processRegex}");
+
+        return result;
     }
 }

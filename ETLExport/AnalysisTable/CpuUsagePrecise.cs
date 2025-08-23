@@ -1,15 +1,15 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using Microsoft.Windows.EventTracing;
+﻿using Microsoft.Windows.EventTracing;
 using Microsoft.Windows.EventTracing.Cpu;
 using Microsoft.Windows.EventTracing.Processes;
 
-public class CpuUsagePrecise : AnalysisTableBase
+namespace ETLExport;
+
+class CpuUsagePrecise : AnalysisTableBase
 {
     public override string TableName => "CPUUsagePrecise";
-    public override string[] ColumnNames => new[] { "Count", "CPU Usage", "Ready", "Waits" };
+    public override string[] ColumnNames => ["Count", "CPU Usage", "Ready", "Waits"];
 
-    private IPendingResult<ICpuSchedulingDataSource> cpuSchedulingData;
+    private IPendingResult<ICpuSchedulingDataSource>? cpuSchedulingData;
 
     public override void UseTrace(ITraceProcessor trace)
     {
@@ -18,7 +18,7 @@ public class CpuUsagePrecise : AnalysisTableBase
 
     public override void Process(IProcess[] processes, long startTime, long endTime)
     {
-        foreach (var activity in cpuSchedulingData.Result.ThreadActivity)
+        foreach (var activity in cpuSchedulingData!.Result.ThreadActivity)
         {
             if (!processes.Contains(activity.Process))
                 continue;
@@ -28,14 +28,10 @@ public class CpuUsagePrecise : AnalysisTableBase
             var newStack = StackStringList(activity.SwitchIn.Stack);
             var readyProcess = activity.ReadyingProcess?.ImageName ?? "Unknown";
             var readyStack = StackStringList(activity.ReadyThreadStack);
-            var path = new List<string> { activity.Process.ImageName };
-            path.AddRange(newStack);
-            path.Add($"READIED BY {readyProcess}");
-            path.AddRange(readyStack);
-            path.Add("");
+            List<string> path = [activity.Process.ImageName, ..newStack, $"READIED BY {readyProcess}", ..readyStack, ""];
             var cpuUsage = activity.Duration.Nanoseconds;
-            var waits = activity.WaitingDuration != null ? activity.WaitingDuration.Value.Nanoseconds : 0;
-            var ready = activity.ReadyDuration.Value.Nanoseconds;
+            var waits = activity.WaitingDuration?.Nanoseconds ?? 0;
+            var ready = activity.ReadyDuration?.Nanoseconds ?? 0;
             Table.Add(path, 1, cpuUsage, ready, waits);
         }
     }

@@ -1,21 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
+﻿using System.Diagnostics;
 using System.Text.Json;
 
 public class TreeTable
 {
     public class Node
     {
-        public Dictionary<string, Node> Children = new Dictionary<string, Node>(StringComparer.Ordinal);
-        public long[] Values;
+        public Dictionary<string, Node> Children = new(StringComparer.Ordinal);
+        public long[]? Values;
 
         public void Add(long[] values)
         {
-            if (Values == null)
-                Values = new long[values.Length];
+            Values ??= new long[values.Length];
             for (int i = 0; i < Values.Length && i < values.Length; i++)
                 Values[i] += values[i];
         }
@@ -39,9 +34,7 @@ public class TreeTable
 
         foreach (var name in path)
         {
-            if (!current.Children.TryGetValue(name, out var child))
-                child = current.Children[name] = new Node();
-            current = child;
+            current = current.Children.GetValueOrDefault(name) ?? (current.Children[name] = new Node());
             current.Add(values);
         }
     }
@@ -53,12 +46,12 @@ public class TreeTable
 
     private void AddNode(Node node, Node other)
     {
-        node.Add(other.Values);
-        foreach (var kvp in other.Children)
+        node.Add(other.Values!);
+        foreach (var (key, value) in other.Children)
         {
-            if (!node.Children.TryGetValue(kvp.Key, out var child))
-                child = node.Children[kvp.Key] = new Node();
-            AddNode(child, kvp.Value);
+            if (!node.Children.TryGetValue(key, out var child))
+                child = node.Children[key] = new Node();
+            AddNode(child, value);
         }
     }
 
@@ -74,7 +67,7 @@ public class TreeTable
         return diffTable;
     }
 
-    private void CreateDiffNode(Node diffNode, Node testNode, Node baseNode)
+    private void CreateDiffNode(Node diffNode, Node? testNode, Node? baseNode)
     {
         var testValues = testNode?.Values ?? new long[ColumnNames.Length];
         var baseValues = baseNode?.Values ?? new long[ColumnNames.Length];
@@ -85,15 +78,15 @@ public class TreeTable
         diffNode.Values = diffValues;
 
         var allKeys = new HashSet<string>();
-        if (testNode != null)
+        if (testNode is not null)
             allKeys.UnionWith(testNode.Children.Keys);
-        if (baseNode != null)
+        if (baseNode is not null)
             allKeys.UnionWith(baseNode.Children.Keys);
 
         foreach (var key in allKeys)
         {
-            Node testChild = null;
-            Node baseChild = null;
+            Node? testChild = null;
+            Node? baseChild = null;
             testNode?.Children.TryGetValue(key, out testChild);
             baseNode?.Children.TryGetValue(key, out baseChild);
 
@@ -104,24 +97,26 @@ public class TreeTable
 
     public void ExportToJson(string filePath)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(filePath)));
-        using (var stream = File.Create(filePath))
-        using (var writer = new Utf8JsonWriter(stream))
-        {
-            writer.WriteStartObject();
+        var directoryName = Path.GetDirectoryName(Path.GetFullPath(filePath));
+        if (directoryName is not null)
+            Directory.CreateDirectory(directoryName);
 
-            writer.WriteStartArray("columnNames");
-            foreach (var name in ColumnNames)
-                writer.WriteStringValue(name);
-            writer.WriteEndArray();
+        using var stream = File.Create(filePath);
+        using var writer = new Utf8JsonWriter(stream);
 
-            writer.WriteStartArray("treeData");
-            foreach (var kvp in Root.Children)
-                ExportNodeToJson(kvp.Key, kvp.Value, writer);
-            writer.WriteEndArray();
+        writer.WriteStartObject();
 
-            writer.WriteEndObject();
-        }
+        writer.WriteStartArray("columnNames");
+        foreach (var name in ColumnNames)
+            writer.WriteStringValue(name);
+        writer.WriteEndArray();
+
+        writer.WriteStartArray("treeData");
+        foreach (var (key, value) in Root.Children)
+            ExportNodeToJson(key, value, writer);
+        writer.WriteEndArray();
+
+        writer.WriteEndObject();
     }
 
     private void ExportNodeToJson(string name, Node node, Utf8JsonWriter writer)
@@ -131,39 +126,38 @@ public class TreeTable
         if (node.Children.Count > 0)
         {
             writer.WriteStartArray("c");
-            foreach (var kvp in node.Children)
-                ExportNodeToJson(kvp.Key, kvp.Value, writer);
+            foreach (var (key, value) in node.Children)
+                ExportNodeToJson(key, value, writer);
             writer.WriteEndArray();
         }
         else
         {
             for (int i = 0; i < ColumnNames.Length; i++)
-                writer.WriteNumber(i.ToString(), node.Values[i]);
+                writer.WriteNumber(i.ToString(), node.Values![i]);
         }
         writer.WriteEndObject();
     }
 
     public static TreeTable ImportFromJson(string filePath)
     {
-        using (var stream = File.OpenRead(filePath))
-        using (var document = JsonDocument.Parse(stream, new JsonDocumentOptions { MaxDepth = 4096 }))
-        {
-            var root = document.RootElement;
-            var columnNames = root.GetProperty("columnNames")
-                .EnumerateArray()
-                .Select(e => e.GetString())
-                .ToArray();
-            var table = new TreeTable(columnNames);
-            var treeData = root.GetProperty("treeData");
-            foreach (var element in treeData.EnumerateArray())
-                table.ImportNodeFromJson(element, table.Root);
-            return table;
-        }
+        using var stream = File.OpenRead(filePath);
+        using var document = JsonDocument.Parse(stream, new JsonDocumentOptions { MaxDepth = 4096 });
+
+        var root = document.RootElement;
+        var columnNames = root.GetProperty("columnNames")
+            .EnumerateArray()
+            .Select(e => e.GetString() ?? string.Empty)
+            .ToArray();
+        var table = new TreeTable(columnNames);
+        var treeData = root.GetProperty("treeData");
+        foreach (var element in treeData.EnumerateArray())
+            table.ImportNodeFromJson(element, table.Root);
+        return table;
     }
 
     private void ImportNodeFromJson(JsonElement element, Node parent)
     {
-        var name = element.GetProperty("n").GetString();
+        var name = element.GetProperty("n").GetString() ?? string.Empty;
         var node = parent.Children[name] = new Node();
         if (element.TryGetProperty("c", out var children))
         {
@@ -177,7 +171,7 @@ public class TreeTable
                 values[i] = element.GetProperty(i.ToString()).GetInt64();
             node.Values = values;
         }
-        parent.Add(node.Values);
+        parent.Add(node.Values!);
     }
 
     public void RenameLeaves(string name)
@@ -190,20 +184,20 @@ public class TreeTable
         if (node.Children.Count == 0)
             return;
 
-        var leavesToRename = new List<KeyValuePair<string, Node>>();
+        List<(string key, Node node)> leavesToRename = [];
 
-        foreach (var kvp in node.Children)
+        foreach (var (key, value) in node.Children)
         {
-            if (kvp.Value.Children.Count > 0)
-                RenameLeaves(kvp.Value, name);
+            if (value.Children.Count > 0)
+                RenameLeaves(value, name);
             else
-                leavesToRename.Add(kvp);
+                leavesToRename.Add((key, value));
         }
 
-        foreach (var kvp in leavesToRename)
+        foreach (var (key, value) in leavesToRename)
         {
-            node.Children.Remove(kvp.Key);
-            node.Children[name] = kvp.Value;
+            node.Children.Remove(key);
+            node.Children[name] = value;
         }
     }
 }

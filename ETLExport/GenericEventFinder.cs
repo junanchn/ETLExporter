@@ -1,16 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using Microsoft.Windows.EventTracing;
+﻿using Microsoft.Windows.EventTracing;
 using Microsoft.Windows.EventTracing.Events;
 
-public class GenericEventFilter
+namespace ETLExport;
+
+public record GenericEventFilter
 {
-    public Guid? ProviderId { get; set; }
-    public int? Task { get; set; }
-    public int? Opcode { get; set; }
-    public string ProviderName { get; set; }
-    public string TaskName { get; set; }
-    public string OpcodeName { get; set; }
+    public Guid? ProviderId { get; init; }
+    public int? Task { get; init; }
+    public int? Opcode { get; init; }
+    public string? ProviderName { get; init; }
+    public string? TaskName { get; init; }
+    public string? OpcodeName { get; init; }
 }
 
 public class GenericEventFinder
@@ -21,15 +21,14 @@ public class GenericEventFinder
     public GenericEventFinder(GenericEventFilter filter, ITraceProcessor traceProcessor)
     {
         _filter = filter;
-        if (filter.ProviderId.HasValue)
-            _pendingGenericEvents = traceProcessor.UseGenericEvents(filter.ProviderId.Value);
-        else
-            _pendingGenericEvents = traceProcessor.UseGenericEvents();
+        _pendingGenericEvents = filter.ProviderId.HasValue
+            ? traceProcessor.UseGenericEvents(filter.ProviderId.Value)
+            : traceProcessor.UseGenericEvents();
     }
 
     public List<IGenericEvent> FindEvents()
     {
-        var results = new List<IGenericEvent>();
+        List<IGenericEvent> results = [];
         foreach (var evt in _pendingGenericEvents.Result.Events)
         {
             if (_filter.ProviderId.HasValue && evt.ProviderId != _filter.ProviderId.Value)

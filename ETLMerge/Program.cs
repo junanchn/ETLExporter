@@ -1,5 +1,4 @@
-﻿using System;
-using System.IO;
+﻿namespace ETLMerge;
 
 class Program
 {
@@ -19,16 +18,13 @@ class Program
                     throw new FileNotFoundException($"Input file not found: {args[i]}");
             }
 
-            TreeTable mergedTable = null;
-            for (int i = 1; i < args.Length; i++)
+            var mergedTable = TreeTable.ImportFromJson(args[1]);
+            Console.WriteLine($"Merged: {args[1]}");
+
+            for (int i = 2; i < args.Length; i++)
             {
                 var table = TreeTable.ImportFromJson(args[i]);
-
-                if (mergedTable == null)
-                    mergedTable = table;
-                else
-                    mergedTable.Add(table);
-
+                mergedTable.Add(table);
                 Console.WriteLine($"Merged: {args[i]}");
             }
 

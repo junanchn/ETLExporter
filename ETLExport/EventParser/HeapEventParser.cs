@@ -1,16 +1,16 @@
-﻿// Parse heap allocation/deallocation events, tracking memory lifecycle
-using System;
-using System.Collections.Generic;
+﻿// Parse heap allocation/deallocation events, tracking memory lifetime
 using System.Runtime.InteropServices;
 using Microsoft.Windows.EventTracing;
 using Microsoft.Windows.EventTracing.Symbols;
 
+namespace ETLExport;
+
 class HeapEventParser
 {
-    private static readonly Guid HeapProviderId = new Guid("222962ab-6180-4b88-a825-346b75f2a24a");
+    private static readonly Guid HeapProviderId = new("222962ab-6180-4b88-a825-346b75f2a24a");
 
-    private readonly List<HeapAllocation> _heapAllocations = new List<HeapAllocation>();
-    private readonly Dictionary<ulong, Dictionary<ulong, HeapAllocation>> _heaps = new Dictionary<ulong, Dictionary<ulong, HeapAllocation>>();
+    private readonly List<HeapAllocation> _heapAllocations = [];
+    private readonly Dictionary<ulong, Dictionary<ulong, HeapAllocation>> _heaps = [];
     private readonly IPendingResult<IStackDataSource> _pendingStackDataSource;
 
     public HeapEventParser(ITraceProcessor trace)
@@ -98,7 +98,7 @@ class HeapEventParser
         {
             foreach (var alloc in allocs.Values)
             {
-                alloc.FreeThreadId = e.ThreadId.Value;
+                alloc.FreeThreadId = e.ThreadId;
                 alloc.FreeTime = e.Timestamp;
                 _heapAllocations.Add(alloc);
             }
@@ -116,8 +116,8 @@ class HeapEventParser
     private void RecordAlloc(ClassicEvent e, ulong heap, ulong addr, ulong size)
     {
         GetHeap(heap)[addr] = new HeapAllocation(
-            e.ProcessId.Value, heap, new AddressRange(new Address(addr), checked((long)size)),
-            e.ThreadId.Value, e.Timestamp, _pendingStackDataSource);
+            e.ProcessId ?? 0, heap, new AddressRange(new Address(addr), checked((long)size)),
+            e.ThreadId ?? 0, e.Timestamp, _pendingStackDataSource);
     }
 
     private void RecordFree(ClassicEvent e, ulong heap, ulong addr)
@@ -125,43 +125,30 @@ class HeapEventParser
         var allocs = GetHeap(heap);
         if (allocs.TryGetValue(addr, out var alloc))
         {
-            alloc.FreeThreadId = e.ThreadId.Value;
+            alloc.FreeThreadId = e.ThreadId;
             alloc.FreeTime = e.Timestamp;
             allocs.Remove(addr);
             _heapAllocations.Add(alloc);
         }
     }
 
-#pragma warning disable CS0649
-    private struct HeapAlloc32 { public uint HeapHandle, Size, Address; }
-    private struct HeapAlloc64 { public ulong HeapHandle, Size, Address; }
-    private struct HeapFree32 { public uint HeapHandle, Address; }
-    private struct HeapFree64 { public ulong HeapHandle, Address; }
-    private struct HeapRealloc32 { public uint HeapHandle, NewAddress, OldAddress, NewSize, OldSize; }
-    private struct HeapRealloc64 { public ulong HeapHandle, NewAddress, OldAddress, NewSize, OldSize; }
-#pragma warning restore CS0649
+    private readonly record struct HeapAlloc32(uint HeapHandle, uint Size, uint Address);
+    private readonly record struct HeapAlloc64(ulong HeapHandle, ulong Size, ulong Address);
+    private readonly record struct HeapFree32(uint HeapHandle, uint Address);
+    private readonly record struct HeapFree64(ulong HeapHandle, ulong Address);
+    private readonly record struct HeapRealloc32(uint HeapHandle, uint NewAddress, uint OldAddress, uint NewSize, uint OldSize);
+    private readonly record struct HeapRealloc64(ulong HeapHandle, ulong NewAddress, ulong OldAddress, ulong NewSize, ulong OldSize);
 }
 
-public class HeapAllocation
+class HeapAllocation(int processId, ulong heapHandle, AddressRange addressRange,
+    int allocThreadId, TraceTimestamp allocTime, IPendingResult<IStackDataSource> pendingStackDataSource)
 {
-    private readonly IPendingResult<IStackDataSource> _pendingStackDataSource;
-    public int ProcessId { get; }
-    public ulong HeapHandle { get; }
-    public AddressRange AddressRange { get; }
-    public int AllocThreadId { get; }
-    public TraceTimestamp AllocTime { get; }
-    public IStackSnapshot AllocStack => _pendingStackDataSource.Result.GetStack(AllocTime, AllocThreadId);
+    public int ProcessId { get; } = processId;
+    public ulong HeapHandle { get; } = heapHandle;
+    public AddressRange AddressRange { get; } = addressRange;
+    public int AllocThreadId { get; } = allocThreadId;
+    public TraceTimestamp AllocTime { get; } = allocTime;
+    public IStackSnapshot AllocStack => pendingStackDataSource.Result.GetStack(AllocTime, AllocThreadId);
     public int? FreeThreadId { get; set; }
     public TraceTimestamp? FreeTime { get; set; }
-
-    public HeapAllocation(int processId, ulong heapHandle, AddressRange addressRange,
-        int allocThreadId, TraceTimestamp allocTime, IPendingResult<IStackDataSource> pendingStackDataSource)
-    {
-        ProcessId = processId;
-        HeapHandle = heapHandle;
-        AddressRange = addressRange;
-        AllocThreadId = allocThreadId;
-        AllocTime = allocTime;
-        _pendingStackDataSource = pendingStackDataSource;
-    }
 }

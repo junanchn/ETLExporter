@@ -153,7 +153,6 @@ public class HeapAllocation
     public IStackSnapshot AllocStack => _pendingStackDataSource.Result.GetStack(AllocTime, AllocThreadId);
     public int? FreeThreadId { get; set; }
     public TraceTimestamp? FreeTime { get; set; }
-    public IStackSnapshot FreeStack => _pendingStackDataSource.Result.GetStack(AllocTime, AllocThreadId);
 
     public HeapAllocation(int processId, ulong heapHandle, AddressRange addressRange,
         int allocThreadId, TraceTimestamp allocTime, IPendingResult<IStackDataSource> pendingStackDataSource)

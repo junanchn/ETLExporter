@@ -5,7 +5,7 @@ namespace ETLExport;
 
 class Images : AnalysisTableBase
 {
-    public override string[] ColumnNames => ["Count", "Size"];
+    public override string[] ColumnNames => ["Count", "Size", "LoadTime", "UnloadTime"];
 
     public override void UseTrace(ITraceProcessor trace)
     {
@@ -22,9 +22,12 @@ class Images : AnalysisTableBase
                 var size = ImpactingSize(image.Size.Bytes, loadTime, unloadTime, startTime, endTime);
                 if (size != 0)
                 {
+                    var relativeLoadTime = loadTime > 0 ? loadTime - startTime : 0;
+                    var relativeUnloadTime = unloadTime < long.MaxValue ? unloadTime - startTime : long.MaxValue;
+
                     var stack = StackStringList(image.LoadStack);
                     List<string> path = [process.ImageName, image.FileName, ..stack, ""];
-                    Table.Add(path, 1, size);
+                    Table.Add(path, 1, size, relativeLoadTime, relativeUnloadTime);
                 }
             }
         }

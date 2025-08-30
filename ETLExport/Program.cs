@@ -11,9 +11,10 @@ record Config
     public required GenericEventFilter StartEvent { get; init; }
     public required GenericEventFilter EndEvent { get; init; }
     public required string ProcessRegex { get; init; }
-    public List<string> SymbolPaths { get; init; } = [];
-    public List<string> SymbolProcesses { get; init; } = [];
-    public required List<string> Tables { get; init; }
+    public string[] SymbolPaths { get; init; } = [];
+    public string[] SymbolProcesses { get; init; } = [];
+    public required string[] Tables { get; init; }
+    public bool SkipExisting { get; init; } = false;
 }
 
 class Program
@@ -28,9 +29,9 @@ class Program
                 return;
             }
 
-            var (etlPath, config) = ParseArguments(args);
+            var (etlPaths, configs) = ParseArguments(args);
 
-            var errors = ValidateArguments(etlPath, config);
+            var errors = ValidateArguments(etlPaths, configs);
             if (errors.Count > 0)
             {
                 foreach (var error in errors)
@@ -38,7 +39,11 @@ class Program
                 Environment.Exit(1);
             }
 
-            ProcessTrace(etlPath!, config!);
+            foreach (var etlPath in etlPaths)
+            {
+                Console.WriteLine($"Processing: {etlPath}");
+                ProcessTrace(etlPath, configs);
+            }
         }
         catch (Exception ex)
         {
@@ -52,12 +57,13 @@ class Program
     static void ShowUsage()
     {
         Console.WriteLine("Usage:");
-        Console.WriteLine("  ETLExport <etl-file> [config-file] [options]");
+        Console.WriteLine("  ETLExport <etl-files...> [config-files...] [options]");
         Console.WriteLine();
         Console.WriteLine("Examples:");
         Console.WriteLine("  ETLExport trace.etl                           # Use trace.etl with default config");
         Console.WriteLine("  ETLExport trace.etl custom.json               # Use trace.etl with custom config");
-        Console.WriteLine("  ETLExport custom.json trace.etl               # Same as above (order doesn't matter)");
+        Console.WriteLine("  ETLExport *.etl *.json                        # Process all ETL files with all configs");
+        Console.WriteLine("  ETLExport t1.etl t2.etl c1.json c2.json       # Process 2 ETL files with 2 configs each");
         Console.WriteLine("  ETLExport trace.etl --SymbolPaths C:\\Symbols  # Override config via command line");
         Console.WriteLine();
         Console.WriteLine("Options:");
@@ -69,47 +75,97 @@ class Program
         Console.WriteLine("  --EndEvent:TaskName <name>     End event task name");
     }
 
-    static (string? etlPath, Config? config) ParseArguments(string[] args)
+    static (List<string> etlPaths, List<(string name, Config config)> configs) ParseArguments(string[] args)
     {
-        var fileArgs = args.TakeWhile((arg, index) => index < 2 && !arg.StartsWith("--")).ToList();
+        var fileArgs = args.TakeWhile(arg => !arg.StartsWith("--")).ToList();
         var configArgs = args.Skip(fileArgs.Count).ToArray();
 
-        string? etlPath = fileArgs.FirstOrDefault(f => f.EndsWith(".etl", StringComparison.OrdinalIgnoreCase));
-        string? configPath = fileArgs.FirstOrDefault(f => f.EndsWith(".json", StringComparison.OrdinalIgnoreCase));
+        var etlPaths = new HashSet<string>();
+        var configPaths = new HashSet<string>();
 
-        configPath ??= "config.json";
+        foreach (var arg in fileArgs)
+        {
+            if (arg.Contains('*') || arg.Contains('?'))
+            {
+                var dir = Path.GetDirectoryName(arg) ?? ".";
+                var pattern = Path.GetFileName(arg);
+                foreach (var file in Directory.GetFiles(dir, pattern))
+                {
+                    var fullPath = Path.GetFullPath(file);
+                    if (file.EndsWith(".etl", StringComparison.OrdinalIgnoreCase))
+                        etlPaths.Add(fullPath);
+                    else if (file.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                        configPaths.Add(fullPath);
+                }
+            }
+            else if (arg.EndsWith(".etl", StringComparison.OrdinalIgnoreCase))
+            {
+                if (File.Exists(arg))
+                    etlPaths.Add(Path.GetFullPath(arg));
+            }
+            else if (arg.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            {
+                if (File.Exists(arg))
+                    configPaths.Add(Path.GetFullPath(arg));
+            }
+        }
 
-        var config = new ConfigurationBuilder()
-            .AddJsonFile(configPath, optional: true)
-            .AddCommandLine(configArgs)
-            .Build()
-            .Get<Config>();
+        if (configPaths.Count == 0)
+            configPaths.Add("config.json");
 
-        return (etlPath, config);
+        var configs = new List<(string name, Config config)>();
+        foreach (var configPath in configPaths.OrderBy(c => c))
+        {
+            var config = new ConfigurationBuilder()
+                .AddJsonFile(configPath, optional: configPaths.Count == 1 && configPath == "config.json")
+                .AddCommandLine(configArgs)
+                .Build()
+                .Get<Config>();
+
+            if (config != null)
+            {
+                var configName = Path.GetFileNameWithoutExtension(configPath);
+                if (configName == "config")
+                    configName = "";
+                configs.Add((configName ?? "", config));
+            }
+        }
+
+        return (etlPaths.OrderBy(e => e).ToList(), configs);
     }
 
-    static List<string> ValidateArguments(string? etlPath, Config? config)
+    static List<string> ValidateArguments(List<string> etlPaths, List<(string name, Config config)> configs)
     {
         List<string> errors = [];
 
-        if (string.IsNullOrEmpty(etlPath))
-            errors.Add("ETL file not specified");
-        else if (!File.Exists(etlPath))
-            errors.Add($"ETL file not found: {etlPath}");
+        if (etlPaths.Count == 0)
+            errors.Add("No ETL files specified");
 
-        if (config is null)
+        foreach (var etlPath in etlPaths)
         {
-            errors.Add("Configuration not specified or invalid");
+            if (!File.Exists(etlPath))
+                errors.Add($"ETL file not found: {etlPath}");
+        }
+
+        if (configs.Count == 0)
+        {
+            errors.Add("No valid configurations found");
             return errors;
         }
 
-        if (config.Tables.Count == 0)
-            errors.Add("At least one output table must be specified");
+        foreach (var (name, config) in configs)
+        {
+            if (config.Tables.Length == 0)
+            {
+                var configName = string.IsNullOrEmpty(name) ? "default config" : $"config '{name}'";
+                errors.Add($"At least one output table must be specified in {configName}");
+            }
+        }
 
         return errors;
     }
 
-    static List<AnalysisTableBase> CreateTablePresets(List<string> tables)
+    static List<AnalysisTableBase> CreateTablePresets(string[] tables)
     {
         List<AnalysisTableBase> presets = [];
 
@@ -137,44 +193,76 @@ class Program
         return presets;
     }
 
-    static void ProcessTrace(string etlPath, Config config)
+    static string GetOutputFileName(string etlPath, string configName, string tableName)
+    {
+        return string.IsNullOrEmpty(configName)
+            ? $"{etlPath}.{tableName}.json"
+            : $"{etlPath}.{configName}.{tableName}.json";
+    }
+
+    static void ProcessTrace(string etlPath, List<(string name, Config config)> configs)
     {
         using var trace = TraceProcessor.Create(etlPath);
-
+        
         var processes = trace.UseProcesses();
         var symbols = trace.UseSymbols();
 
-        var presets = CreateTablePresets(config.Tables);
-        if (presets.Count == 0)
+        var validConfigs = new List<(string name, Config config, List<AnalysisTableBase> presets,
+                                     GenericEventFinder start, GenericEventFinder end)>();
+
+        foreach (var (name, config) in configs)
         {
-            throw new InvalidOperationException("No valid tables to export");
+            var presets = CreateTablePresets(config.Tables);
+            if (presets.Count == 0)
+                continue;
+
+            if (config.SkipExisting &&
+                presets.All(p => File.Exists(GetOutputFileName(etlPath, name, p.TableName))))
+            {
+                var configDesc = string.IsNullOrEmpty(name) ? "default config" : $"config '{name}'";
+                Console.WriteLine($"Skipping {configDesc} - all reports exist");
+                continue;
+            }
+
+            foreach (var preset in presets)
+                preset.UseTrace(trace);
+
+            validConfigs.Add((name, config, presets,
+                            new GenericEventFinder(config.StartEvent, trace),
+                            new GenericEventFinder(config.EndEvent, trace)));
         }
 
-        foreach (var preset in presets)
-            preset.UseTrace(trace);
-
-        var startEventFinder = new GenericEventFinder(config.StartEvent!, trace);
-        var endEventFinder = new GenericEventFinder(config.EndEvent!, trace);
+        if (validConfigs.Count == 0)
+            return;
 
         trace.Process();
 
-        var (startTime, endTime) = GetTimeRange(startEventFinder, endEventFinder);
-
-        var targetProcesses = GetTargetProcesses(processes, config.ProcessRegex);
-
-        if (config.SymbolPaths.Count > 0 && config.SymbolProcesses.Count > 0)
+        foreach (var (name, config, presets, startFinder, endFinder) in validConfigs)
         {
-            symbols.Result.LoadSymbolsForConsoleAsync(
-                SymCachePath.Automatic,
-                new SymbolPath(config.SymbolPaths.ToArray()),
-                config.SymbolProcesses.ToArray()).Wait();
-        }
+            try
+            {
+                var (startTime, endTime) = GetTimeRange(startFinder, endFinder);
+                var targetProcesses = GetTargetProcesses(processes, config.ProcessRegex);
 
-        foreach (var preset in presets)
-        {
-            preset.Process(targetProcesses, startTime, endTime);
-            preset.Table.ExportToJson($"{etlPath}.{preset.TableName}.json");
-            Console.WriteLine($"Exported: {etlPath}.{preset.TableName}.json");
+                symbols.Result.LoadSymbolsForConsoleAsync(
+                    SymCachePath.Automatic,
+                    new SymbolPath(config.SymbolPaths),
+                    config.SymbolProcesses).Wait();
+
+                foreach (var preset in presets)
+                {
+                    preset.Process(targetProcesses, startTime, endTime);
+
+                    var outputName = GetOutputFileName(etlPath, name, preset.TableName);
+                    preset.Table.ExportToJson(outputName);
+                    Console.WriteLine($"Exported: {outputName}");
+                }
+            }
+            catch (Exception ex)
+            {
+                var configDesc = string.IsNullOrEmpty(name) ? "default config" : $"config '{name}'";
+                Console.WriteLine($"Error processing {configDesc}: {ex.Message}");
+            }
         }
     }
 

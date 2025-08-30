@@ -23,6 +23,7 @@ public class TreeTable
     {
         ColumnNames = columnNames;
         Root = new Node();
+        Root.Values = new long[columnNames.Length];
     }
 
     public void Add(IEnumerable<string> path, params long[] values)

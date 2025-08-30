@@ -18,7 +18,7 @@ class Images : AnalysisTableBase
         {
             foreach (var image in process.Images)
             {
-                var loadTime = image.LoadTime?.Nanoseconds ?? long.MaxValue;
+                var loadTime = image.LoadTime?.Nanoseconds ?? 0;
                 var unloadTime = image.UnloadTime?.Nanoseconds ?? long.MaxValue;
                 var size = ImpactingSize(image.Size.Bytes, loadTime, unloadTime, startTime, endTime);
                 if (size != 0)

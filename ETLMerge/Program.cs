@@ -34,6 +34,8 @@ class Program
         catch (Exception ex)
         {
             Console.WriteLine($"Error: {ex.Message}");
+            Console.WriteLine("Stack:");
+            Console.WriteLine(ex.StackTrace);
             Environment.Exit(1);
         }
     }

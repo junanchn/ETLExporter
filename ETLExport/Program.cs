@@ -34,17 +34,11 @@ class Program
             if (errors.Count > 0)
             {
                 foreach (var error in errors)
-                    Console.WriteLine(error);
+                    Console.WriteLine($"Error: {error}");
                 Environment.Exit(1);
             }
 
-            var presets = CreateTablePresets(config!.Tables);
-            if (presets.Count == 0)
-            {
-                throw new InvalidOperationException("No valid tables to export");
-            }
-
-            ProcessTrace(etlPath!, config, presets);
+            ProcessTrace(etlPath!, config!);
         }
         catch (Exception ex)
         {
@@ -99,18 +93,18 @@ class Program
         List<string> errors = [];
 
         if (string.IsNullOrEmpty(etlPath))
-            errors.Add("Error: ETL file not specified");
+            errors.Add("ETL file not specified");
         else if (!File.Exists(etlPath))
-            errors.Add($"Error: ETL file not found: {etlPath}");
+            errors.Add($"ETL file not found: {etlPath}");
 
         if (config is null)
         {
-            errors.Add("Error: Configuration not specified or invalid");
+            errors.Add("Configuration not specified or invalid");
             return errors;
         }
 
         if (config.Tables.Count == 0)
-            errors.Add("Error: At least one output table must be specified");
+            errors.Add("At least one output table must be specified");
 
         return errors;
     }
@@ -143,12 +137,18 @@ class Program
         return presets;
     }
 
-    static void ProcessTrace(string etlPath, Config config, List<AnalysisTableBase> presets)
+    static void ProcessTrace(string etlPath, Config config)
     {
         using var trace = TraceProcessor.Create(etlPath);
 
         var processes = trace.UseProcesses();
         var symbols = trace.UseSymbols();
+
+        var presets = CreateTablePresets(config.Tables);
+        if (presets.Count == 0)
+        {
+            throw new InvalidOperationException("No valid tables to export");
+        }
 
         foreach (var preset in presets)
             preset.UseTrace(trace);

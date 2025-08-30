@@ -6,7 +6,7 @@ namespace ETLExport;
 
 abstract class AnalysisTableBase
 {
-    public abstract string TableName { get; }
+    public virtual string TableName => GetType().Name;
     public abstract string[] ColumnNames { get; }
     public TreeTable Table { get; set; }
 

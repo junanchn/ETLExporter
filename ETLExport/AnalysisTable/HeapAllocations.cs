@@ -5,7 +5,6 @@ namespace ETLExport;
 
 class HeapAllocations : AnalysisTableBase
 {
-    public override string TableName => "HeapAllocations";
     public override string[] ColumnNames => ["Count", "Size"];
     protected virtual bool StackReverse => false;
 
@@ -54,6 +53,5 @@ class HeapAllocations : AnalysisTableBase
 
 class HeapAllocationsReverse : HeapAllocations
 {
-    public override string TableName => "HeapAllocationsReverse";
     protected override bool StackReverse => true;
 }

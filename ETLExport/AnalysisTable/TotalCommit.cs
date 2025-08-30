@@ -6,7 +6,6 @@ namespace ETLExport;
 
 class TotalCommit : AnalysisTableBase
 {
-    public override string TableName => "TotalCommit";
     public override string[] ColumnNames => ["Count", "Size"];
     protected virtual bool StackReverse => false;
 
@@ -90,6 +89,5 @@ class TotalCommit : AnalysisTableBase
 
 class TotalCommitReverse : TotalCommit
 {
-    public override string TableName => "TotalCommitReverse";
     protected override bool StackReverse => true;
 }

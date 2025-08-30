@@ -6,7 +6,6 @@ namespace ETLExport;
 
 class CpuUsageSampled : AnalysisTableBase
 {
-    public override string TableName => "CPUUsageSampled";
     public override string[] ColumnNames => ["Count", "Weight"];
 
     private IPendingResult<ICpuSampleDataSource>? cpuSampleData;

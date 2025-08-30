@@ -6,7 +6,6 @@ namespace ETLExport;
 
 class CpuUsagePrecise : AnalysisTableBase
 {
-    public override string TableName => "CPUUsagePrecise";
     public override string[] ColumnNames => ["Count", "CPU Usage", "Ready", "Waits"];
 
     private IPendingResult<ICpuSchedulingDataSource>? cpuSchedulingData;

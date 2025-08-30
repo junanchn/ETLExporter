@@ -6,7 +6,6 @@ namespace ETLExport;
 
 class DiskUsage : AnalysisTableBase
 {
-    public override string TableName => "DiskUsage";
     public override string[] ColumnNames => ["Count", "Size", "Disk Service Time"];
 
     private IPendingResult<IDiskActivityDataSource>? diskIOData;

@@ -5,7 +5,6 @@ namespace ETLExport;
 
 class Images : AnalysisTableBase
 {
-    public override string TableName => "Images";
     public override string[] ColumnNames => ["Count", "Size"];
 
     public override void UseTrace(ITraceProcessor trace)

@@ -426,3 +426,6 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Directory.Build.props
+Build/

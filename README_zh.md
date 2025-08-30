@@ -73,18 +73,18 @@ ETLExport.exe config.json trace.etl
 - `trace.etl.HeapAllocations.json`
 - `trace.etl.DiskUsage.json`
 
-### 2. ETLMerge - 合并结果
+### 2. TreeMerge - 合并结果
 
 合并多个分析结果：
 ```bash
-ETLMerge.exe merged.json result1.json result2.json result3.json
+TreeMerge.exe merged.json result1.json result2.json result3.json
 ```
 
-### 3. ETLDiff - 比较结果
+### 3. TreeDiff - 比较结果
 
 比较两个分析结果：
 ```bash
-ETLDiff.exe diff.json test.json baseline.json
+TreeDiff.exe diff.json test.json baseline.json
 ```
 
 输出将包含每个指标的三个值：
@@ -152,7 +152,7 @@ ETLExport.exe config.json baseline.etl
 ETLExport.exe config.json test.etl
 
 # 3. 比较
-ETLDiff.exe comparison.json test.etl.CpuUsageSampled.json baseline.etl.CpuUsageSampled.json
+TreeDiff.exe comparison.json test.etl.CpuUsageSampled.json baseline.etl.CpuUsageSampled.json
 
 # 4. 可视化
 # 打开 TreeTableViewer.html 并加载 comparison.json
@@ -166,7 +166,7 @@ ETLExport.exe config.json run2.etl
 ETLExport.exe config.json run3.etl
 
 # 合并结果
-ETLMerge.exe merge.json run1.etl.HeapAllocations.json run2.etl.HeapAllocations.json run3.etl.HeapAllocations.json
+TreeMerge.exe merge.json run1.etl.HeapAllocations.json run2.etl.HeapAllocations.json run3.etl.HeapAllocations.json
 
 # 查看聚合数据
 # 打开 TreeTableViewer.html 并加载 merge.json

@@ -73,18 +73,18 @@ Output files:
 - `trace.etl.HeapAllocations.json`
 - `trace.etl.DiskUsage.json`
 
-### 2. ETLMerge - Merging Results
+### 2. TreeMerge - Merging Results
 
 Merge multiple analysis results:
 ```bash
-ETLMerge.exe merged.json result1.json result2.json result3.json
+TreeMerge.exe merged.json result1.json result2.json result3.json
 ```
 
-### 3. ETLDiff - Comparing Results
+### 3. TreeDiff - Comparing Results
 
 Compare two analysis results:
 ```bash
-ETLDiff.exe diff.json test.json baseline.json
+TreeDiff.exe diff.json test.json baseline.json
 ```
 
 The output will contain three values for each metric:
@@ -152,7 +152,7 @@ ETLExport.exe config.json baseline.etl
 ETLExport.exe config.json test.etl
 
 # 3. Compare
-ETLDiff.exe comparison.json test.etl.CpuUsageSampled.json baseline.etl.CpuUsageSampled.json
+TreeDiff.exe comparison.json test.etl.CpuUsageSampled.json baseline.etl.CpuUsageSampled.json
 
 # 4. Visualize
 # Open TreeTableViewer.html and load comparison.json
@@ -166,7 +166,7 @@ ETLExport.exe config.json run2.etl
 ETLExport.exe config.json run3.etl
 
 # Merge results
-ETLMerge.exe merge.json run1.etl.HeapAllocations.json run2.etl.HeapAllocations.json run3.etl.HeapAllocations.json
+TreeMerge.exe merge.json run1.etl.HeapAllocations.json run2.etl.HeapAllocations.json run3.etl.HeapAllocations.json
 
 # View aggregated data
 # Open TreeTableViewer.html and load merge.json

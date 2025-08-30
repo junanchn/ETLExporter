@@ -5,9 +5,9 @@ VisualStudioVersion = 17.14.36414.22
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ETLExport", "ETLExport\ETLExport.csproj", "{080E6593-0F85-498D-953B-C343D4504264}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ETLDiff", "ETLDiff\ETLDiff.csproj", "{26C56CC1-4571-4CBD-A3C6-4AE418501F1F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TreeDiff", "TreeDiff\TreeDiff.csproj", "{26C56CC1-4571-4CBD-A3C6-4AE418501F1F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ETLMerge", "ETLMerge\ETLMerge.csproj", "{59F563F7-8FC8-4FAB-9D48-23194DF6D38E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TreeMerge", "TreeMerge\TreeMerge.csproj", "{59F563F7-8FC8-4FAB-9D48-23194DF6D38E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
